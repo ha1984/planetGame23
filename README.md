@@ -9,3 +9,5 @@ zlib
 
 
 14.3.17: added glm library and .obj file loader for 3D geometries
+
+next steps: character movement and camera rotation
