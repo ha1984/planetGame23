@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="android_native_app_glue.h" />
+    <ClInclude Include="ShapeGenerator.h" />
+    <ClInclude Include="Vertex.h">
+      <Filter>primitives</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="android_native_app_glue.c" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="sources\png.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngerror.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngget.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngmem.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngpread.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngread.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngrio.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngrtran.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngrutil.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngset.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngtrans.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngwio.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngwrite.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngwtran.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="sources\pngwutil.c">
+      <Filter>sources</Filter>
+    </ClCompile>
+    <ClCompile Include="ShapeGenerator.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="sources">
+      <UniqueIdentifier>{ff5c6233-681f-480f-8add-af24222bb8da}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="objloader">
+      <UniqueIdentifier>{905561db-ac28-4226-8cd7-3db5fb360f38}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="primitives">
+      <UniqueIdentifier>{7679c3dc-e9ab-4da8-be0b-8740a4daa887}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="sources\Android.mk">
+      <Filter>sources</Filter>
+    </None>
+    <None Include="sources\Application.mk">
+      <Filter>sources</Filter>
+    </None>
+    <None Include="tiny_obj_loader\.bintray.in">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\.clang-format">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\.drone.yml">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\.gitignore">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\.travis.yml">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\appveyor.yml">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\build.ninja">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\premake4.lua">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\README.md">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\tinyobjloader.pc.in">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\tinyobjloader-config.cmake.in">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\vcsetup.bat">
+      <Filter>objloader</Filter>
+    </None>
+    <None Include="tiny_obj_loader\wercker.yml">
+      <Filter>objloader</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="tiny_obj_loader\CMakeLists.txt">
+      <Filter>objloader</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
