@@ -1,0 +1,11 @@
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\OpenGLESApp7.apk.recipe
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\OpenGLESApp7.apk.recipe.merged
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\FileStringReplace.incremental
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\OpenGLESApp7.apk
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\OpenGLESApp7.lastsuccessfuldeploy
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\Package\libs\armeabi-v7a\libOpenGLESApp7.so
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\Package\libs\armeabi-v7a\libOpenGLESApp7.a
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\Package\assets\Astronaut.png
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\Package\assets\ground.png
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\Package\assets\sky2.png
+C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.Application\ARM\Debug\Package\assets\sky2.txt

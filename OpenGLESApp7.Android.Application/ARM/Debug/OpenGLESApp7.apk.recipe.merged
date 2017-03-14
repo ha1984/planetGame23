@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project>
+  <SOLibPaths>C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\ARM\Debug\libOpenGLESApp7.so;C:\ProgramData\Microsoft\AndroidNDK64\android-ndk-r11c\prebuilt\android-arm\gdbserver\gdbserver;C:\ProgramData\Microsoft\AndroidNDK64\android-ndk-r11c\sources\cxx-stl\gnu-libstdc++\4.9\libs\armeabi-v7a\thumb\libgnustl_static.a;C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\ARM\Debug\libOpenGLESApp7.a</SOLibPaths>
+  <AndroidLibPaths></AndroidLibPaths>
+  <OObjPaths>C:\Users\Ahrens\Documents\VisualStudio\Projects\OpenGLESApp7\OpenGLESApp7\OpenGLESApp7.Android.NativeActivity\ARM\Debug</OObjPaths>
+  <Configuration>Debug</Configuration>
+  <Platform>ARM</Platform>
+  <AndroidArchitecture>armeabi-v7a</AndroidArchitecture>
+</project>

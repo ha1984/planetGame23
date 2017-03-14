@@ -1,0 +1,1 @@
+$(AntDependencies)=;$(ApplicationId)=applicationId = "";$(ConfigurationType)=application;$(AarDependencies)=;$(AarDependenciesSettings)=;$(ApplicationName)=OpenGLESApp7;$(AndroidAppLibName)=OpenGLESApp7;$(AndroidBuildToolsVersion)=24.0.0;$(AndroidAPILevelNumber)=24;$(androidapilevel)=android-24;$(projectname)=OpenGLESApp7.Android.Application;
