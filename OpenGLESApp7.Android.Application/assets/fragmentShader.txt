@@ -1,0 +1,30 @@
+        precision mediump float;
+	uniform sampler2D OurTexture;
+	uniform sampler2D normalMap;
+        uniform vec3 lightPosition;
+        uniform vec3 eyePosition;
+	uniform float ambient;
+        varying vec4 vColor;
+	varying vec2 vTexCoord;
+	varying vec3 positionWorld;
+        varying vec3 normalWorld;
+        void main()
+        {
+			vec4 normalColor = texture2D(normalMap, vTexCoord);
+			//vec3 normal = vec3(normalColor.r*2.0-1.0,0.0,normalColor.g*2.0-1.0);
+
+			vec3 r = lightPosition - positionWorld;
+			vec3 lightVector = normalize(r);
+
+			//specular:
+			vec3 reflectedLightVector = -reflect(lightVector,normalize(normalWorld));
+			vec3 eyeDirection = normalize(eyePosition - positionWorld);
+			float product = dot(reflectedLightVector, eyeDirection);
+			float s = clamp(product,0.0,1.0);
+			float len = length(r);
+			float ss = pow(s,20.0)/len;
+			vec3 light = vec3(ss, ss, ss) + vec3(ambient,ambient,ambient);
+			//
+            //gl_FragColor = vColor;
+            gl_FragColor = texture2D(OurTexture, vTexCoord) * vec4(light.x,light.y,light.z, 1.0);
+        }
