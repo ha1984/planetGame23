@@ -22,225 +22,275 @@
 #include <iostream>     // std::cout
 #include <fstream> 
 #include <istream>
-#include <streambuf>
+#include <iterator>
 #include <string>
+#include <stdlib.h>
+#include <stdio.h>
 #include <tiny_obj_loader.h>
 #include <vector>
 #include "Vertex.h"
+#include "VertexAnimate.h"
 #include <ShapeData.h>
+#include <ShapeAnim.h>
 #include "ShapeGenerator.h"
-#include "../OpenGLESApp7.Shared/SimpleRenderer.h"
+#include "Engine.h"
+#include "bone.h"
+#include "Game.h"
+#include "Region.h"
+#include "Region1.h"
+#include "Region2.h"
+#include "Check.h"
+#include "Bullet.h"
 
 using namespace std;
 
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "astroGame.NativeActivity", __VA_ARGS__))
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "astroGame.NativeActivity", __VA_ARGS__))
 
-AAsset* asset = 0;
-GLuint numberOfTextures = 3;
-std::vector<ShapeData> shapeExternVec;
+bone* Bone = new bone[14];
+ShapeAnim playerShape;
+bool run = false;
+int stepCount;
+Game game;
+Region region;
+AAsset* asset;
 
-/**
-* Unsere gespeicherten Statusdaten.
-*/
-struct saved_state {
-	float angle;
-	int32_t x;
-	int32_t y;
-};
 
-/**
-* Freigegebener Status für unsere App.
-*/
-struct engine {
-	struct android_app* app;
 
-	ASensorManager* sensorManager;
-	const ASensor* accelerometerSensor;
-	ASensorEventQueue* sensorEventQueue;
+static std::istream &safeGetline(std::istream &is, std::string &t) {
+	t.clear();
 
-	int animating;
-	EGLDisplay display;
-	EGLSurface surface;
-	EGLContext context;
-	int32_t width;
-	int32_t height;
-	struct saved_state state;
+	// The characters in the stream are read one-by-one using a std::streambuf.
+	// That is faster than reading them one-by-one using the std::istream.
+	// Code that uses streambuf this way must be guarded by a sentry object.
+	// The sentry object performs various tasks,
+	// such as thread synchronization and updating the stream state.
 
-	std::unique_ptr<SimpleRenderer> mCubeRenderer;
-};
+	std::istream::sentry se(is, true);
+	std::streambuf *sb = is.rdbuf();
 
-struct membuf : std::streambuf
-{
-	membuf(char* begin, char* end) {
-		this->setg(begin, begin, end);
+	for (;;) {
+		int c = sb->sbumpc();
+		switch (c) {
+		case '\n':
+			return is;
+		case '\r':
+			if (sb->sgetc() == '\n') sb->sbumpc();
+			return is;
+		case EOF:
+			// Also handle the case when the last line has no line ending
+			if (t.empty()) is.setstate(std::ios::eofbit);
+			return is;
+		default:
+			t += static_cast<char>(c);
+		}
 	}
-};
-
-void png_asset_read(png_structp png, png_bytep data, png_size_t size) {
-	//AAsset_seek(pngAsset_, 0, 0);
-	AAsset_read(asset, data, size);
-	/*int numBytesRemaining = AAsset_getRemainingLength(asset);
-	LOGI("Read size: %d, remaining: %d", size, numBytesRemaining);*/
 }
 
+vector<float> char_to_vector(unsigned char* pdata) {
+	//int N = sizeof(pdata);
+	std::istringstream in(reinterpret_cast<char*>(pdata));
+	std::istream *inStream = &in;
+	vector<float> v;
 
-void load_texture(struct engine* engine, unsigned char* pdata, GLuint j) {
-	off_t fileLength = AAsset_getLength(asset);
-	unsigned char* pBuffer = new unsigned char[fileLength];
+	std::string linebuf;
+	while (inStream->peek() != -1) {
+		safeGetline(*inStream, linebuf);
 
-	//off_t bufferLength = sizeof(pBuffer);
+		// Trim newline '\r\n' or '\n'
+		if (linebuf.size() > 0) {
+			if (linebuf[linebuf.size() - 1] == '\n')
+				linebuf.erase(linebuf.size() - 1);
+		}
+		if (linebuf.size() > 0) {
+			if (linebuf[linebuf.size() - 1] == '\r')
+				linebuf.erase(linebuf.size() - 1);
+		}
 
-	memcpy(pBuffer, pdata, fileLength * sizeof(char));
+		// Skip if empty line.
+		if (linebuf.empty()) {
+			continue;
+		}
 
-	// new for loading png image data:
-	int HEADER_SIZE = 8;
-	png_byte* buffer = new png_byte[HEADER_SIZE];
-	int numBytesRead = AAsset_read(asset, buffer, HEADER_SIZE);
-	//int numBytesRemaining = AAsset_getRemainingLength(asset);
+		// Skip leading space.
+		const char *token = linebuf.c_str();
 
-	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (!png_ptr) {
-		LOGI("Unable to create PNG structure: %s");
+		token += strspn(token, " \t");
+
+		assert(token);
+		if (token[0] == '\0') continue;  // empty line
+
+		if (token[0] == '#') continue;  // comment line
+
+		std::string fs(token);
+		float f = (float)std::atof(fs.c_str());
+		v.push_back(f);
 	}
-
-	png_infop info_ptr = png_create_info_struct(png_ptr);
-	if (!info_ptr) {
-		png_destroy_read_struct(&png_ptr, (png_infopp)NULL, (png_infopp)NULL);
-		LOGI("Unable to create png info : %s");
-	}
-
-	png_infop end_info = png_create_info_struct(png_ptr);
-	if (!end_info) {
-		png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
-		LOGI("Unable to create png end info : %s");
-	}
-
-	if (setjmp(png_jmpbuf(png_ptr))) {
-		LOGI("Error during setjmp : %s");
-		png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-	}
-	png_set_read_fn(png_ptr, NULL, png_asset_read);
-	png_set_sig_bytes(png_ptr, 8);
-	png_read_info(png_ptr, info_ptr);
-
-	int bit_depth, color_type;
-	png_uint_32 twidth, theight;
-	png_get_IHDR(png_ptr, info_ptr, &twidth, &theight, &bit_depth, &color_type,
-		NULL, NULL, NULL);
-	LOGI("Width: %d, height: %d.", twidth, theight);
-
-	// Update the png info struct.
-	png_read_update_info(png_ptr, info_ptr);
-
-	// Row size in bytes.
-	int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
-	LOGI("Row size: %d bytes.", rowbytes);
-
-	// Allocate the image_data as a big block, to be given to opengl
-	png_byte *image_data = new png_byte[rowbytes * theight];
-	if (!image_data) {
-		//clean up memory and close stuff
-		png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-		LOGI("Unable to allocate image_data while loading %s ");
-	}
-
-	//row_pointers is for pointing to image_data for reading the png with libpng
-	png_bytep *row_pointers = new png_bytep[theight];
-	if (!row_pointers) {
-		//clean up memory and close stuff
-		png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-		delete[] image_data;
-		LOGI("Unable to allocate row_pointer while loading %s ");
-	}
-	// set the individual row_pointers to point at the correct offsets of image_data
-	for (int i = 0; i < theight; ++i)
-		row_pointers[theight - 1 - i] = image_data + i * rowbytes;
-
-	//read the png into image_data through row_pointers
-	png_read_image(png_ptr, row_pointers);
-
-	for (int i = 0; i < 10; i++) {
-		LOGI("Pixel %d: %d %d %d %d", i, image_data[i * 4], image_data[i * 4 + 1],
-			image_data[i * 4 + 2], image_data[i * 4 + 3]);
-	}
-
-	//Now generate the OpenGL texture object
-	/*	Image* image = new Image((unsigned char*)image_data, twidth, theight,
-	twidth * theight * 4, 0);*/
-
-	png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-	delete[] row_pointers;
-
-	//
-	glEnable(GL_TEXTURE_2D);
-
-	//engine->mCubeRenderer->sendTextureToOpenGL(pBuffer);
-	engine->mCubeRenderer->sendTextureToOpenGL((unsigned char*)image_data, engine->mCubeRenderer->textureVec[j], twidth, theight);
+	return v;
 }
 
-void load_data(struct engine* engine) {
-	
-	    AAssetManager* manager = engine->app->activity->assetManager;
-
-		asset = AAssetManager_open(manager, "Astronaut.png", AASSET_MODE_STREAMING);
-		unsigned char* pdata = (unsigned char*)(AAsset_getBuffer(asset));
-		load_texture(engine, pdata, 0);
-		AAsset_close(asset);
-
-		asset = AAssetManager_open(manager, "sky2.png", AASSET_MODE_STREAMING);
-		pdata = (unsigned char*)(AAsset_getBuffer(asset));
-		load_texture(engine, pdata, 1);
-		AAsset_close(asset);
-
-		asset = AAssetManager_open(manager, "ground.png", AASSET_MODE_STREAMING);
-		pdata = (unsigned char*)(AAsset_getBuffer(asset));
-		load_texture(engine, pdata, 2);
-		AAsset_close(asset);
-
-}
-
-ShapeData load_geometry(struct engine* engine, const char* filename) {
+ShapeAnim& load_player(struct engine* engine, const char* filename, bone* Bone) {
+	//AAsset* asset = 0;
 	AAssetManager* manager = engine->app->activity->assetManager;
 	asset = AAssetManager_open(manager, filename, AASSET_MODE_STREAMING);
 	unsigned char* pdata = (unsigned char*)(AAsset_getBuffer(asset));
 
-	size_t len = strlen((char*)pdata);
-	//char tempData[929670];
-	char tempData[len];
-	strncpy(tempData, (char*)pdata, len);
-	membuf sbuf(tempData, tempData + sizeof(tempData));
-	std::istream in(&sbuf);
+	std::istringstream in((char*)pdata);
 
-	ShapeData shape = ShapeGenerator::makeObject(&in);
+	ShapeAnim shape = ShapeGenerator::makePlayer(&in, Bone);
 
 	AAsset_close(asset);
 
 	return shape;
 }
-/**
-* Initialisieren eines EGL-Kontexts für die aktuelle Anzeige.
-*/
-static int engine_init_display(struct engine* engine) {
-	// OpenGL-ES und -EGL initialisieren
-	// texture:
 
+vector<float> load_bone(struct engine* engine, const char* filename) {
+	//AAsset* asset = 0;
+	AAssetManager* manager = engine->app->activity->assetManager;
+	asset = AAssetManager_open(manager, filename, AASSET_MODE_STREAMING);
+	unsigned char* pdata = (unsigned char*)(AAsset_getBuffer(asset));
+	vector<float> v = char_to_vector(pdata);
+	AAsset_close(asset);
+
+	return v;
+}
+
+vector<int> load_bone_idx(struct engine* engine, const char* filename) {
+	//AAsset* asset = 0;
+	AAssetManager* manager = engine->app->activity->assetManager;
+	asset = AAssetManager_open(manager, filename, AASSET_MODE_STREAMING);
+	unsigned char* pdata = (unsigned char*)(AAsset_getBuffer(asset));
+
+	vector<float> vf = char_to_vector(pdata);
+	vector<int> v;
+
+	for (int i = 0; i < vf.size(); i++) {
+		v.push_back((int)vf[i]);
+	}
+
+	AAsset_close(asset);
+
+	return v;
+}
+
+void load_bone_weights(struct engine* engine) {
+	vector<float> v = load_bone(engine, "hand_L_weights.txt");
+	vector<int> idx = load_bone_idx(engine, "hand_L_indices.txt");
+	Bone[0].weights.resize(v.size());
+	Bone[0].weights = v;
+	Bone[0].indices.resize(v.size());
+	Bone[0].indices = idx;
+
+	v = load_bone(engine, "bottom_arm_L_weights.txt");
+	idx = load_bone_idx(engine, "bottom_arm_L_indices.txt");
+	Bone[1].weights.resize(v.size());
+	Bone[1].weights = v;
+	Bone[1].indices.resize(v.size());
+	Bone[1].indices = idx;
+
+	v = load_bone(engine, "upper_arm_L_weights.txt");
+	idx = load_bone_idx(engine, "upper_arm_L_indices.txt");
+	Bone[2].weights.resize(v.size());
+	Bone[2].weights = v;
+	Bone[2].indices.resize(v.size());
+	Bone[2].indices = idx;
+
+	v = load_bone(engine, "hand_R_weights.txt");
+	idx = load_bone_idx(engine, "hand_R_indices.txt");
+	Bone[3].weights.resize(v.size());
+	Bone[3].weights = v;
+	Bone[3].indices.resize(v.size());
+	Bone[3].indices = idx;
+
+	v = load_bone(engine, "bottom_arm_R_weights.txt");
+	idx = load_bone_idx(engine, "bottom_arm_R_indices.txt");
+	Bone[4].weights.resize(v.size());
+	Bone[4].weights = v;
+	Bone[4].indices.resize(v.size());
+	Bone[4].indices = idx;
+
+	v = load_bone(engine, "upper_arm_R_weights.txt");
+	idx = load_bone_idx(engine, "upper_arm_R_indices.txt");
+	Bone[5].weights.resize(v.size());
+	Bone[5].weights = v;
+	Bone[5].indices.resize(v.size());
+	Bone[5].indices = idx;
+
+	v = load_bone(engine, "foot_front_L_weights.txt");
+	idx = load_bone_idx(engine, "foot_front_L_indices.txt");
+	Bone[6].weights.resize(v.size());
+	Bone[6].weights = v;
+	Bone[6].indices.resize(v.size());
+	Bone[6].indices = idx;
+
+	v = load_bone(engine, "foot_back_L_weights.txt");
+	idx = load_bone_idx(engine, "foot_back_L_indices.txt");
+	Bone[7].weights.resize(v.size());
+	Bone[7].weights = v;
+	Bone[7].indices.resize(v.size());
+	Bone[7].indices = idx;
+
+	v = load_bone(engine, "bottom_leg_L_weights.txt");
+	idx = load_bone_idx(engine, "bottom_leg_L_indices.txt");
+	Bone[8].weights.resize(v.size());
+	Bone[8].weights = v;
+	Bone[8].indices.resize(v.size());
+	Bone[8].indices = idx;
+
+	v = load_bone(engine, "upper_leg_L_weights.txt");
+	idx = load_bone_idx(engine, "upper_leg_L_indices.txt");
+	Bone[9].weights.resize(v.size());
+	Bone[9].weights = v;
+	Bone[9].indices.resize(v.size());
+	Bone[9].indices = idx;
+
+	v = load_bone(engine, "foot_front_R_weights.txt");
+	idx = load_bone_idx(engine, "foot_front_R_indices.txt");
+	Bone[10].weights.resize(v.size());
+	Bone[10].weights = v;
+	Bone[10].indices.resize(v.size());
+	Bone[10].indices = idx;
+
+	v = load_bone(engine, "foot_back_R_weights.txt");
+	idx = load_bone_idx(engine, "foot_back_R_indices.txt");
+	Bone[11].weights.resize(v.size());
+	Bone[11].weights = v;
+	Bone[11].indices.resize(v.size());
+	Bone[11].indices = idx;
+
+	v = load_bone(engine, "bottom_leg_R_weights.txt");
+	idx = load_bone_idx(engine, "bottom_leg_R_indices.txt");
+	Bone[12].weights.resize(v.size());
+	Bone[12].weights = v;
+	Bone[12].indices.resize(v.size());
+	Bone[12].indices = idx;
+
+	v = load_bone(engine, "upper_leg_R_weights.txt");
+	idx = load_bone_idx(engine, "upper_leg_R_indices.txt");
+	Bone[13].weights.resize(v.size());
+	Bone[13].weights = v;
+	Bone[13].indices.resize(v.size());
+	Bone[13].indices = idx;
+}
+
+void stepchange(struct engine* engine) {
+	engine->renderer->runEvent(engine->state.y, engine->height);
+
+	stepCount = engine->renderer->step;
+}
+
+static int loadRegion2(struct engine* engine) {
 	
-	/*
-	* Geben Sie hier die Attribute der gewünschten Konfiguration an.
-	* Unten wählen wir eine EGLConfig mit mindestens 8 Bits pro
-	* Farbkomponente aus, die mit den Fenstern auf dem Bildschirm kompatibel ist.
-	*/
 	const EGLint attribs[] = {
 		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
 		EGL_BLUE_SIZE, 8,
 		EGL_GREEN_SIZE, 8,
-        EGL_RED_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_DEPTH_SIZE, 8,
-        EGL_STENCIL_SIZE, 8,
-        EGL_NONE
+		EGL_RED_SIZE, 8,
+		EGL_ALPHA_SIZE, 8,
+		EGL_DEPTH_SIZE, 8,
+		EGL_STENCIL_SIZE, 8,
+		EGL_NONE
 	};
 	EGLint w, h, format;
 	EGLint numConfigs;
@@ -253,14 +303,10 @@ static int engine_init_display(struct engine* engine) {
 	eglInitialize(display, 0, 0);
 
 	/* Hier wählt die Anwendung die von ihr gewünschte Konfiguration aus. In diesem
-	* Beispiel handelt es sich um einen stark vereinfachten Auswahlvorgang, in dem wir die 
+	* Beispiel handelt es sich um einen stark vereinfachten Auswahlvorgang, in dem wir die
 	* erste "EGLConfig" auswählen, die unseren Kriterien entspricht. */
 	eglChooseConfig(display, attribs, &config, 1, &numConfigs);
 
-	/* "EGL_NATIVE_VISUAL_ID" ist ein Attribut der "EGLConfig", dessen
-	* Akzeptierung durch "ANativeWindow_setBuffersGeometry()" garantiert ist.
-	* Sobald wir eine "EGLConfig" ausgewählt haben, können wir die ANativeWindow-Puffer
-	* gefahrlos mithilfe von  "EGL_NATIVE_VISUAL_ID" entsprechend neu konfigurieren. */
 	eglGetConfigAttrib(display, config, EGL_NATIVE_VISUAL_ID, &format);
 
 	ANativeWindow_setBuffersGeometry(engine->app->window, 0, 0, format);
@@ -284,46 +330,132 @@ static int engine_init_display(struct engine* engine) {
 	engine->width = w;
 	engine->height = h;
 	engine->state.angle = 0;
-	engine->state.x = 1000;
-	engine->state.y = 1000;
+	engine->state.x = 100;
+	engine->state.y = h / 2 + 1;
 
-	ShapeData shape = load_geometry(engine, "astron.txt.txt");
-	shapeExternVec.push_back(shape);
-	shape = load_geometry(engine, "sky2.txt");
-	shapeExternVec.push_back(shape);
+	Region2 region2;
 
-	if (!engine->mCubeRenderer)
+	std::vector<int> csvWidths = load_bone_idx(engine, "FontData.txt");
+	std::vector<ShapeData> shapeExternVec = region2.shape_loader(engine, csvWidths);
+
+	game.knowsMundus = false;
+	game.knowsCrystal = false;
+	game.hasCrystal = false;
+	game.knowsPortal = false;
+
+	if (!engine->renderer)
 	{
-		engine->mCubeRenderer.reset(new SimpleRenderer(shapeExternVec));
-		engine->mCubeRenderer->UpdateWindowSize(w, h);
+		engine->renderer.reset(new SimpleRenderer(shapeExternVec, playerShape));
+		engine->renderer->UpdateWindowSize(w, h);
+		engine->renderer->setupTexture();
+		engine->renderer->step = stepCount;
 	}
 
-	engine->mCubeRenderer->textureVec.resize(numberOfTextures);
+	//load modelToWorldMatrices:
+	region2.setModelToWorlds(engine);
+
 	//load textures from file:
-	load_data(engine);
+	region2.load_Tex(engine);
 
-
+	//load text dialogues:
+	region = region2.load_dialog();
+	engine->renderer->dialog = region.dialog1;
+	engine->renderer->fontWidths = csvWidths;
+	engine->renderer->location1 = region.location1;
+	engine->renderer->location2 = region.location2;
+	engine->renderer->location3 = region.location3;
 
 	return 0;
 }
 
-/**
-* Nur der aktuelle Frame in der Anzeige.
-*/
-static void engine_draw_frame(struct engine* engine) {
-	if (engine->display == NULL) {
-		// Keine Anzeige.
-		return;
+static int engine_init_display(struct engine* engine) {
+	// Initialisieren eines EGL-Kontexts für die aktuelle Anzeige.
+	/*
+	* Geben Sie hier die Attribute der gewünschten Konfiguration an.
+	* Unten wählen wir eine EGLConfig mit mindestens 8 Bits pro
+	* Farbkomponente aus, die mit den Fenstern auf dem Bildschirm kompatibel ist.
+	*/
+	const EGLint attribs[] = {
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_BLUE_SIZE, 8,
+		EGL_GREEN_SIZE, 8,
+		EGL_RED_SIZE, 8,
+		EGL_ALPHA_SIZE, 8,
+		EGL_DEPTH_SIZE, 8,
+		EGL_STENCIL_SIZE, 8,
+		EGL_NONE
+	};
+	EGLint w, h, format;
+	EGLint numConfigs;
+	EGLConfig config;
+	EGLSurface surface;
+	EGLContext context;
+
+	EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+
+	eglInitialize(display, 0, 0);
+
+	/* Hier wählt die Anwendung die von ihr gewünschte Konfiguration aus. In diesem
+	* Beispiel handelt es sich um einen stark vereinfachten Auswahlvorgang, in dem wir die
+	* erste "EGLConfig" auswählen, die unseren Kriterien entspricht. */
+	eglChooseConfig(display, attribs, &config, 1, &numConfigs);
+
+	eglGetConfigAttrib(display, config, EGL_NATIVE_VISUAL_ID, &format);
+
+	ANativeWindow_setBuffersGeometry(engine->app->window, 0, 0, format);
+
+	surface = eglCreateWindowSurface(display, config, engine->app->window, NULL);
+
+	EGLint contextAttribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+	context = eglCreateContext(display, config, NULL, contextAttribs);
+
+	if (eglMakeCurrent(display, surface, surface, context) == EGL_FALSE) {
+		LOGW("Unable to eglMakeCurrent");
+		return -1;
 	}
 
-	//moving light:
-	engine->mCubeRenderer->lightX = (float)engine->state.x/1000.0 -1.0;
+	eglQuerySurface(display, surface, EGL_WIDTH, &w);
+	eglQuerySurface(display, surface, EGL_HEIGHT, &h);
+
+	engine->display = display;
+	engine->context = context;
+	engine->surface = surface;
+	engine->width = w;
+	engine->height = h;
+	engine->state.angle = 0;
+	engine->state.x = 100;
+	engine->state.y = h/2 + 1;
+
+	Region1 region1;
+
+	std::vector<int> csvWidths = load_bone_idx(engine, "FontData.txt");
+	std::vector<ShapeData> shapeExternVec = region1.shape_loader(engine, csvWidths);
+
+
 	
-	engine->mCubeRenderer->lightZ = (float)engine->state.y/1000.0 -1.0;
+	if (!engine->renderer)
+	{
+		engine->renderer.reset(new SimpleRenderer(shapeExternVec, playerShape));
+		engine->renderer->UpdateWindowSize(w, h);
+		engine->renderer->setupTexture();
+		engine->renderer->step = stepCount;
+	}
+	//load modelToWorldMatrices:
+	region1.setModelToWorlds(engine);
 
-	engine->mCubeRenderer->Draw();
+	//load textures from file:
+	region1.load_Tex(engine);
+	
+	//load text dialogues:
+	region = region1.load_dialog();
+	engine->renderer->dialog = region.dialog1;
+	engine->renderer->fontWidths = csvWidths;
+	engine->renderer->location1 = region.location1;
+	engine->renderer->location2 = region.location2;
+	engine->renderer->location3 = region.location3;
 
-	eglSwapBuffers(engine->display, engine->surface);
+	return 0;
 }
 
 /**
@@ -345,6 +477,41 @@ static void engine_term_display(struct engine* engine) {
 	engine->context = EGL_NO_CONTEXT;
 	engine->surface = EGL_NO_SURFACE;
 }
+/**
+* Nur der aktuelle Frame in der Anzeige.
+*/
+static void engine_draw_frame(struct engine* engine) {
+
+	if (engine->display == NULL) {
+		// Keine Anzeige.
+		return;
+	}
+
+	if (run) {
+		stepchange(engine);
+	}
+
+	if (length(engine->renderer->pos - glm::vec3(0.0, 0.0, -15.0)) < 2.0 && game.knowsCrystal) {
+		game.hasCrystal = true;
+		engine->renderer->dialog = region.dialog3;
+	}
+
+	if (length(engine->renderer->pos) < 2.0 && game.hasCrystal) {
+		game.knowsPortal = true;
+		engine->renderer->dialog = region.dialog4;
+	}
+
+	if (length(engine->renderer->pos - glm::vec3(0.0, 0.0, 15.0)) < 2.0 && game.knowsPortal) {
+		engine->renderer->dialog = region.dialog5;
+		game.portal1 = true;
+	}
+	
+	engine->renderer->paintGL();
+
+	eglSwapBuffers(engine->display, engine->surface);
+}
+
+
 
 /**
 * Das nächste Eingabeereignis verarbeiten.
@@ -352,8 +519,38 @@ static void engine_term_display(struct engine* engine) {
 static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
 	struct engine* engine = (struct engine*)app->userData;
 	if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-		engine->state.x = AMotionEvent_getX(event, 0);
-		engine->state.y = AMotionEvent_getY(event, 0);
+		int action = AKeyEvent_getAction(event) & AMOTION_EVENT_ACTION_MASK;
+		int h = engine->height;
+		int w = engine->width;
+		//Check check(event, w, h);
+		if ((action == AMOTION_EVENT_ACTION_MOVE) && AMotionEvent_getY(event, 0) < 14 * h / 20) {
+			engine->state.x = AMotionEvent_getX(event, 0);
+			//engine->state.y = AMotionEvent_getY(event, 0);
+			engine->renderer->mouseMoveEvent(engine->state.x);
+		}
+		if ((action == AMOTION_EVENT_ACTION_DOWN) && AMotionEvent_getY(event, 0) < 14 * h / 20) {
+			run = true;
+			engine->state.y = AMotionEvent_getY(event, 0);
+		}
+		if (action == AMOTION_EVENT_ACTION_UP) {
+			run = false;
+		}
+		//arrow button:
+		if ((action == AMOTION_EVENT_ACTION_DOWN) && (AMotionEvent_getY(event, 0) > 14 * h / 20) && (AMotionEvent_getY(event, 0) < 18 * h / 20) && (AMotionEvent_getX(event, 0) < 3 * w / 20)) {
+			engine->renderer->answer2 = !engine->renderer->answer2;
+		}
+		//select button:
+		if ((action == AMOTION_EVENT_ACTION_DOWN) && engine->renderer->answer2 && (AMotionEvent_getY(event, 0) > 18 * h / 20) && (AMotionEvent_getX(event, 0) < 3 * w / 20)) {
+			game.knowsCrystal = true;
+			engine->renderer->dialog = region.dialog2;
+		}
+		// gun button:
+		if ((action == AMOTION_EVENT_ACTION_DOWN) && (AMotionEvent_getY(event, 0) > 14 * h / 20) && (AMotionEvent_getY(event, 0) < 18 * h / 20) && (AMotionEvent_getX(event, 0) > 17 * w / 20)) {
+			Bullet* bullet = new Bullet(engine->renderer->pos, engine->renderer->camera->viewDirection, engine->renderer->getTimeNsec());
+			engine->renderer->bulletVec.push_back(bullet);
+			//check.button3 = false;
+		}
+
 		return 1;
 	}
 	return 0;
@@ -374,7 +571,13 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
 	case APP_CMD_INIT_WINDOW:
 		// Das Fenster wird angezeigt, stellen Sie es fertig.
 		if (engine->app->window != NULL) {
-			engine_init_display(engine);
+			//game.portal1 = true;
+			if (!game.portal1) {
+				engine_init_display(engine);
+			}
+			else {
+				loadRegion2(engine);
+			}
 			engine_draw_frame(engine);
 		}
 		break;
@@ -435,6 +638,10 @@ void android_main(struct android_app* state) {
 		// Wir beginnen mit einem zuvor gespeicherten Status. Stellen Sie die App aus diesem wieder her.
 		engine.state = *(struct saved_state*)state->savedState;
 	}
+
+	//load bone rotation matrices:
+	load_bone_weights(&engine);
+	playerShape = load_player(&engine, "astronew2.txt", Bone);
 
 	engine.animating = 1;
 
